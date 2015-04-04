@@ -17,14 +17,14 @@ sigma_image_noise = 1.0
 
 r_k_k = (0,0,0)
 
-N_features = 20;
+N_features = 20
 x_camera = 12 # 3(3d pose) + 4( rotation quaternion ) + 3 ( linear velocity) + 2 ( angular velocity)
 N = x_camera +  N_features * 6
 
-x = np.matrix((1, N), np.float32); # State vector
-u = np.array((1, 5), np.float32); # Control vector
+x = np.matrix((1, N), np.float32) # State vector
+u = np.array((1, 5), np.float32) # Control vector
 
-P = np.identity(N, np.float32) # Covariance of prediction
+P = np.identity(N, np.float32) # State covariance
 z = np.matrix((10, 10)) # Measurement
 
 F = np.matrix((10, 10)) # State transition Jacobian
