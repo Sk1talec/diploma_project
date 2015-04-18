@@ -2,9 +2,10 @@ import cv2
 import numpy as np
 import random
 
-f = 2
-c_x = 200
-c_y = 200
+D = 400
+f = D
+c_x = D / 2
+c_y = D / 2
 K = np.array([
     [f, 0, c_x],
     [0, f, c_y],
@@ -27,7 +28,7 @@ u = np.array((1, 5), np.float32) # Control vector
 P = np.identity(N, np.float32) # State covariance
 z = np.matrix((10, 10)) # Measurement
 
-F = np.matrix((10, 10)) # State transition Jacobian
+F = np.matrix((10, 10)) # State transition Jacobian. Can be expressed as f derivative
 H = np.matrix((10, 10)) # Measurement Jacobian
 
 
@@ -38,7 +39,9 @@ I = np.identity(10)
 
 #state transition
 def f(x, u):
-    pass
+    return np.matrix([
+        []
+    ], np.float32)
 
 #Observation
 def h(x):
