@@ -7,9 +7,10 @@ import numpy as np
 from math import cos, sin, pi, sqrt, acos
 from numpy.linalg import norm
 
-VISUAL_MODE=True
+VISUAL_MODE=False
 
 D = 400
+FPS = 10
 # x + 10 = 0
 Speed = 10
 K = 10
@@ -134,10 +135,10 @@ def rotation_matrix(axis, theta):
 
 def main():
     global K
-    file = open("data.txt", "w");
+    file = open("data.txt", "w")
     K = get_camera_matrix()
     features = generate_features()
-    v = cv2.VideoWriter("myVideo_temp.avi", cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), 10, (D, D))
+    v = cv2.VideoWriter("myVideo_temp.avi", cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), FPS, (D, D))
     for frame in xrange(100):
         screen = np.zeros((D,D,3),np.uint8)
 
@@ -182,8 +183,9 @@ def main():
                 continue
             screen[D - s[1,0], s[0,0]] = (255, 0, 0)
 
-            file.write("{} {} {} {:.0f} \n".format(frame, i, 0, s[0,0]))
-            file.write("{} {} {} {:.0f} \n".format(frame, i, 1, s[1,0]))
+            if not VISUAL_MODE:
+                file.write("{} {} {} {:.0f} \n".format(frame, i, 0, s[0,0]))
+                file.write("{} {} {} {:.0f} \n".format(frame, i, 1, s[1,0]))
 
         '''
         for x in plane2:
