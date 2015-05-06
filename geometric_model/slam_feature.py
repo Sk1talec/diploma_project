@@ -1,4 +1,5 @@
 __author__ = 'Kirill'
+import numpy as np
 
 
 class Feature:
@@ -13,5 +14,8 @@ class Feature:
     init_frame = -1
     visible=True
     number=0
+    z=0
     h=0
     H=0
+    S=0
+    R=np.eye(2, 2, dtype=np.float32)

@@ -71,3 +71,16 @@ def qconj(q):
     q_out[0]=float(q[0])
 
     return q_out
+
+def normJac(q):
+     r=float(q[0])
+     x=float(q[1])
+     y=float(q[2])
+     z=float(q[3])
+
+     return (r*r+x*x+y*y+z*z) ** (-3/2) * np.matrix([
+            [x*x+y*y+z*z, -r*x, -r*y, -r*z],
+            [-x*r, r*r+y*y+z*z, -x*y, -x*z],
+            [-y*r, -y*x, r*r+x*x+z*z, -y*z],
+            [-z*r, -z*x, -z*y, r*r+x*x+y*y]],
+                                                    np.float32)

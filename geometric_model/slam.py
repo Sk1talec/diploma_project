@@ -116,7 +116,7 @@ def predict_camera_measurement(x, frame_features):
         feature_number = feature[0]
         y = x[N_cam_params + 6 * i : N_cam_params + 6 * (i + 1)]
         h = h_inverse_depth(y, camera_position, r_wc)
-        if (h != []):
+        if (len(h) > 0):
             FEATURES_DATA[feature_number].h = h
 
 def m(a,b):
@@ -146,7 +146,6 @@ def h_inverse_depth( yinit, camera_pos, r_wc):
     if ((atan2(x, z) * 180/pi < -60) or (atan2(x, z) * 180/pi > 60) or
         (atan2(y, z) * 180/pi < -60) or (atan2(y, z) * 180/pi > 60)):
         return []
-
     u, v = hu(hrl)
 
     if ( u > 0 ) and ( u < D) and ( v > 0 ) and ( v < D):
@@ -240,6 +239,7 @@ def prepare_features():
 
 
 def compute_features_derivatives(x, K, frame_features):
+    global FEATURES_DATA
     x_camera = x[:13]
     for i, feature in enumerate(frame_features):
         f_number = feature[0]
@@ -247,8 +247,60 @@ def compute_features_derivatives(x, K, frame_features):
         FEATURES_DATA[f_number].H = slam_derivatives.calculate_H_inverse_depth(x_camera, y, K, FEATURES_DATA[f_number].h, len(frame_features), i)
 
 def update_features(x, P, frame_features):
+    global FEATURES_DATA
     predict_camera_measurement(x, frame_features)
     compute_features_derivatives(x, K, frame_features)
+
+    for i, feature in enumerate(frame_features):
+        feature_number = feature[0]
+        if len(FEATURES_DATA[feature_number].h) > 0:
+            f_data = FEATURES_DATA[feature_number]
+            f_data.S = f_data.H * P * f_data.H.T + f_data.R
+            f_data.z = np.matrix([[feature[1], feature[2]]], np.float32).T
+
+
+def update(x_tmp, P_tmp, z, h, H, R):
+    if len(z)>0:
+        S = H * P_tmp * H.T + R
+        K = P_tmp * H.T * S.I
+
+        x = x_tmp + K*(z - h)
+        P = P_tmp - K*S*K.T
+        P = 0.5*P + 0.5*P.T
+
+        Jnorm = quaternions.normJac(x[3:7])
+        P = np.concatenate([
+                               np.concatenate([P[0:3,0:3], P[0:3,3:7]*Jnorm.T, P[0:3,7:]], axis=1),
+                               np.concatenate([Jnorm*P[3:7,0:3], Jnorm*P[3:7,3:7]*Jnorm.T, Jnorm*P[3:7,7:]], axis=1),
+                               np.concatenate([P[7:,0:3], P[7:, 3:7] * Jnorm.T, P[7:,7:]], axis=1)],
+                           axis=0)
+
+        x[3:7] = x[3:7] / np.linalg.norm( x[3:7])
+        return x, P
+    else:
+        return x_tmp, P_tmp
+
+def update_step(x_tmp, P_tmp, frame_features):
+    global FEATURES_DATA
+    #TODO rewrite to speedup!
+    z = FEATURES_DATA[frame_features[0][0]].z
+    h = FEATURES_DATA[frame_features[0][0]].h
+    H = FEATURES_DATA[frame_features[0][0]].H
+
+    for i, feature in enumerate(frame_features[1:]):
+        f_number = feature[0]
+        f_data = FEATURES_DATA[f_number]
+        z = np.concatenate([z, f_data.z], axis=0)
+        h = np.concatenate([h, f_data.h], axis=0)
+        H = np.concatenate([H, f_data.H], axis=0)
+
+    R = np.eye(len(z), dtype=np.float32)
+
+    return update(x_tmp, P_tmp, z, h, H, R)
+
+
+def cut_x_and_p():
+    return x[:13], P[:13,:13]
 
 
 def main():
@@ -257,22 +309,17 @@ def main():
     global F, H, P, x
     dt = 1. / FPS
     for k in xrange(1, len(frames)):
+        x, P = cut_x_and_p()
         prepare_features()
         prev_frame_features = frames[k - 1]
         x, P = init_features(x, P, prev_frame_features)
-        x_tmp, P_tmp = predict_step(x, P, u, dt)
+        
+        x_tmp, P_tmp = predict_step(x, P, u, dt) # PREDICT STEP
 
         frame_features = frames[k]
         update_features(x, P, frame_features)
-        #TODO z, h, H
-        #TODO 2. Q, R
-
-        #Update
-        y = z - h(x_tmp)  # Innovation or measurement residual
-        S = H * P_tmp * H.T + R  # Innovation (or residual) covariance
-        K = P_tmp * H.T * S.I  # Near-optimal Kalman gain
-        x = x_tmp + K * y  # Updated state estimate
-        P = (I - K * H) * P_tmp  # Updated covariance estimate
+        
+        x, P = update_step(x_tmp, P_tmp, frame_features) # UPDATE STEP
 
 
 if __name__ == '__main__':
