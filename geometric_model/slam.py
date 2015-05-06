@@ -130,7 +130,6 @@ def m(a,b):
 
 def h_inverse_depth( yinit, camera_pos, r_wc):
     r_cw = r_wc.T
-
     feature_pos = yinit[0:3]
     theta = float(yinit[3])
     phi = float(yinit[4])
@@ -203,7 +202,6 @@ def init_features(x, P, frame_features):
         ft = new_feature(x, u, v, initial_depth)
         x=np.concatenate((x, ft), axis=0)
         P = slam_derivatives.add_a_feature_covariance_inverse_depth(P, u, v, x, STD_PXL, 1, K)
-
         f_data = slam_feature.Feature()
         f_data.uv_init = np.matrix([[u, v]], np.float32)
         f_data.y = ft
@@ -226,16 +224,17 @@ def predict_step(x, P, u, dt):
 
 
     P_tmp = np.concatenate([
-        np.concatenate([F*P[0:13,0:13]*F.I + Q, F*P[0:13, 14:]], axis=1),
-        np.concatenate([P[14:,0:13]*F.I, P[14:,14:]], axis=1),
+        np.concatenate([F*P[:13,:13]*F.I + Q, F*P[:13, 13:]], axis=1),
+        np.concatenate([P[13:,:13]*F.I, P[13:,13:]], axis=1),
                       ], axis=0)
 
     return x_tmp, P_tmp
 
 
 def prepare_features():
-    for number, feature in FEATURES_DATA:
-        feature.visible=False
+    global FEATURES_DATA
+    for key in FEATURES_DATA:
+        FEATURES_DATA[key].visible=False
 
 
 def compute_features_derivatives(x, K, frame_features):
@@ -300,7 +299,16 @@ def update_step(x_tmp, P_tmp, frame_features):
 
 
 def cut_x_and_p():
-    return x[:13], P[:13,:13]
+    return x, P
+
+
+def print_result(x, frame_features):
+    for i, feature in enumerate(frame_features):
+        f_offset = 13 + i * 6
+        a = float(x[f_offset + 3])
+        b = float(x[f_offset + 4])
+        p = float(x[f_offset + 5])
+        print("FEATURE", feature[0], "Angles: ", a, b, "Distance: ", 1 / p)
 
 
 def main():
@@ -309,17 +317,20 @@ def main():
     global F, H, P, x
     dt = 1. / FPS
     for k in xrange(1, len(frames)):
+        #TODO Implement dynamic features addition and deletion
+        print("Frame: ", str(k), "Num features:", len(frames[k]))
         x, P = cut_x_and_p()
         prepare_features()
         prev_frame_features = frames[k - 1]
         x, P = init_features(x, P, prev_frame_features)
-        
         x_tmp, P_tmp = predict_step(x, P, u, dt) # PREDICT STEP
 
-        frame_features = frames[k]
+        frame_features = frames[k] # Read new frame
+
         update_features(x, P, frame_features)
-        
         x, P = update_step(x_tmp, P_tmp, frame_features) # UPDATE STEP
+
+        print_result(x, frame_features)
 
 
 if __name__ == '__main__':
