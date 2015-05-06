@@ -4,11 +4,10 @@ from math import *
 
 
 def q2r(q):
-    r = q[0]
-    x = q[1]
-    y = q[2]
-    z = q[3]
-
+    r = float(q[0])
+    x = float(q[1])
+    y = float(q[2])
+    z = float(q[3])
     return np.matrix([
                          [r * r + x * x - y * y - z * z, 2 * (x * y - r * z), 2 * (z * x + r * y)],
                          [2 * (x * y + r * z), r * r - x * x + y * y - z * z, 2 * (y * z - r * x)],
@@ -31,7 +30,7 @@ def q_mult(q1, q2):
     x = w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2
     y = w1 * y2 + y1 * w2 + z1 * x2 - x1 * z2
     z = w1 * z2 + z1 * w2 + x1 * y2 - y1 * x2
-    return w, x, y, z
+    return float(w), float(x), float(y), float(z)
 
 def q_conjugate(q):
     q = normalize(q)
@@ -65,3 +64,10 @@ def normalize(v, tolerance=0.00001):
         mag = sqrt(mag2)
         v = tuple(n / mag for n in v)
     return v
+
+
+def qconj(q):
+    q_out=-q
+    q_out[0]=float(q[0])
+
+    return q_out
