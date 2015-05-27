@@ -229,10 +229,10 @@ def dq3_dq2(q):
     ], np.float32)
 
 
-def calculate_H_inverse_depth(x_camera, y, K, h, features_size, feature_cur_position):
+def calculate_H_inverse_depth(x_camera, y, K, h, features_size, feature_index):
     H = np.zeros((2, 13 + 6 * features_size), np.float32)
     H[:, 0:13] = dh_dxv( K, x_camera, y, h)
-    H[:,13 + 6 * (feature_cur_position): 13 + 6 * (feature_cur_position + 1)] = dh_dy( K, x_camera, y, h)
+    H[:,feature_index: feature_index + 6] = dh_dy( K, x_camera, y, h)
 
     return H
 

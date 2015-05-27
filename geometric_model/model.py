@@ -5,9 +5,11 @@ __author__ = 'Kirill'
 import cv2
 import numpy as np
 from math import cos, sin, pi, sqrt, acos
-from numpy.linalg import norm
 
-VISUAL_MODE=False
+VISUAL_MODE=True
+
+DUMP_FILE="data_temp.txt"
+VIDEO_FILE="myVideo_temp.avi"
 
 D = 400
 FPS = 10
@@ -37,7 +39,7 @@ plane2 = plane2[..., np.newaxis]
 '''
 def feature(plane, x, y):
     if VISUAL_MODE:
-        for i in xrange(50):
+        for i in xrange(5):
             plane.append((x, y, i / 10., 1))
     else:
         plane.append((x, y, 3, 1))
@@ -56,22 +58,27 @@ def fill_square(plane):
 def generate_features():
     plane1 = []
 
-    feature(plane1, 1, 1)
-    feature(plane1, 1, 2)
-    feature(plane1, 2, 1)
-    feature(plane1, 2, 2)
-    feature(plane1, 0, -10)
-    feature(plane1, 5, -8)
-    feature(plane1, 5, -50)
-    feature(plane1, 2, -80)
-    feature(plane1, 10, -100)
-    feature(plane1, -5, -100)
-    feature(plane1, 20, -150)
-    feature(plane1, 1, -4)
-    feature(plane1, 100, -150)
-    feature(plane1, -100, -200)
-    feature(plane1, -75, -75)
-    feature(plane1, -10, -10000)
+    feature(plane1, 1, 1) # 1
+    feature(plane1, 1, 2) # 2
+    feature(plane1, 2, 1) # 3
+    feature(plane1, 2, 2) # 4
+    feature(plane1, 0, -10) # 5
+    feature(plane1, 5, -8)  # 6
+    feature(plane1, 5, -50) # 7
+    feature(plane1, 2, -80) # 8
+    feature(plane1, 10, -100) # 9
+    feature(plane1, -5, -100) # 10
+    feature(plane1, 20, -150) # 11
+    feature(plane1, 1, -4)    # 12
+    feature(plane1, 100, -150) # 14
+    feature(plane1, -100, -200) # 15
+    feature(plane1, -75, -75)   # 16
+    feature(plane1, -10, -10000) # 17
+    feature(plane1, 10, -100) # 17
+    feature(plane1, 20, -100) # 17
+    feature(plane1, 30, -100) # 17
+    feature(plane1, 3, -100) # 17
+    feature(plane1, -10, -100) # 17
 
 
     '''
@@ -135,15 +142,23 @@ def rotation_matrix(axis, theta):
 
 def main():
     global K
-    file = open("data.txt", "w")
+    file = open(DUMP_FILE, "w")
     K = get_camera_matrix()
     features = generate_features()
-    v = cv2.VideoWriter("myVideo_temp.avi", cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), FPS, (D, D))
-    for frame in xrange(100):
+    v = cv2.VideoWriter(VIDEO_FILE, cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), FPS, (D, D))
+    for frame in xrange(300):
+        tf = frame
+        if frame <= 100:
+            frame = frame
+        elif frame <= 200:
+            frame = 200 - frame
+        else:
+            frame = frame - 200
+
         screen = np.zeros((D,D,3),np.uint8)
 
         offset = -15 + 30. * frame / 100.
-        camera = [offset, 8, 1]
+        camera = [offset, 8, 2 * cos(2 * pi / 30. * offset)]
         eye = np.array(camera, np.float32)
         look_at = np.array([offset, -10000, 1], np.float32)
         up = np.array([0, 0, 1], np.float32)
@@ -181,11 +196,10 @@ def main():
             s = np.rint(s)
             if (not (s[0,0] > 0 and s[1,0] > 0 and s[0,0] < D and s[1,0] < D)):
                 continue
-            screen[D - s[1,0], s[0,0]] = (255, 0, 0)
+            screen[D - s[1,0], s[0,0]] = (255, 255, 255)
 
-            if not VISUAL_MODE:
-                file.write("{} {} {} {:.0f} \n".format(frame, i, 0, s[0,0]))
-                file.write("{} {} {} {:.0f} \n".format(frame, i, 1, s[1,0]))
+            file.write("{} {} {} {:.0f} \n".format(tf, i, 0, s[0,0]))
+            file.write("{} {} {} {:.0f} \n".format(tf, i, 1, s[1,0]))
 
         '''
         for x in plane2:

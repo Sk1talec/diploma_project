@@ -14,6 +14,8 @@ class Feature:
     init_frame = -1
     visible=True
     number=0
+    index=0
+    retrack=False
     z=0
     h=0
     H=0
