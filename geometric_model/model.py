@@ -7,6 +7,7 @@ import numpy as np
 from math import cos, sin, pi, sqrt, acos
 
 VISUAL_MODE=True
+NUM_FRAMES = 500
 
 DUMP_FILE="data_temp.txt"
 VIDEO_FILE="myVideo_temp.avi"
@@ -58,8 +59,8 @@ def fill_square(plane):
 def generate_features():
     plane1 = []
 
-    feature(plane1, 1, 1) # 1
-    feature(plane1, 1, 2) # 2
+    feature(plane1, -1, 1) # 1
+    feature(plane1, -1, 2) # 2
     feature(plane1, 2, 1) # 3
     feature(plane1, 2, 2) # 4
     feature(plane1, 0, -10) # 5
@@ -68,17 +69,17 @@ def generate_features():
     feature(plane1, 2, -80) # 8
     feature(plane1, 10, -100) # 9
     feature(plane1, -5, -100) # 10
-    feature(plane1, 20, -150) # 11
-    feature(plane1, 1, -4)    # 12
-    feature(plane1, 100, -150) # 14
-    feature(plane1, -100, -200) # 15
-    feature(plane1, -75, -75)   # 16
-    feature(plane1, -10, -10000) # 17
-    feature(plane1, 10, -100) # 17
-    feature(plane1, 20, -100) # 17
-    feature(plane1, 30, -100) # 17
-    feature(plane1, 3, -100) # 17
-    feature(plane1, -10, -100) # 17
+    # feature(plane1, 20, -150) # 11
+    # feature(plane1, 1, -4)    # 12
+    # feature(plane1, 100, -150) # 14
+    # feature(plane1, -100, -200) # 15
+    # feature(plane1, -75, -75)   # 16
+    # # feature(plane1, -10, -10000) # 17
+    # feature(plane1, 10, -100) # 18
+    # feature(plane1, 20, -100) # 19
+    # feature(plane1, 30, -100) # 20
+    # feature(plane1, 3, -100) # 21
+    # feature(plane1, -10, -100) # 22
 
 
     '''
@@ -140,25 +141,38 @@ def rotation_matrix(axis, theta):
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
 
+def showMap(features):
+    x = []
+    y = []
+    for f in features:
+        x.append(f[0])
+        y.append(f[1])
+    import matplotlib.pyplot as plt
+    plt.plot(x, y, 'ro')
+    plt.show()
+
+
+
 def main():
     global K
     file = open(DUMP_FILE, "w")
     K = get_camera_matrix()
     features = generate_features()
     v = cv2.VideoWriter(VIDEO_FILE, cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), FPS, (D, D))
-    for frame in xrange(300):
+    for frame in xrange(NUM_FRAMES):
         tf = frame
-        if frame <= 100:
-            frame = frame
-        elif frame <= 200:
-            frame = 200 - frame
+        if ((frame + 100) % 200 < 100):
+            frame = 100 - (frame % 100)
         else:
-            frame = frame - 200
+            frame = (frame % 100)
 
         screen = np.zeros((D,D,3),np.uint8)
 
         offset = -15 + 30. * frame / 100.
-        camera = [offset, 8, 2 * cos(2 * pi / 30. * offset)]
+        #camera = [offset, frame / 5., 2 * cos(2 * pi / 30. * offset)]
+        camera = [sin(2 * pi / 100. * frame) * 0.5, frame / 10. + 7., 1]
+        print(tf, frame, camera)
+        #camera = [0, frame / 10. + 7., 1]
         eye = np.array(camera, np.float32)
         look_at = np.array([offset, -10000, 1], np.float32)
         up = np.array([0, 0, 1], np.float32)
@@ -170,8 +184,6 @@ def main():
 
         r_axis = np.cross(eye, look_at)
         r_axis = r_axis / np.linalg.norm(r_axis)
-
-        print(r_axis)
 
         # R = rotation_matrix([0, 0, 1], pi / 4) * rotation_matrix(r_axis, 3 * pi / 2.)
         angle = float(frame) / 100 * pi * 2
@@ -186,7 +198,6 @@ def main():
         C = np.array([camera]) # Camera position in world coordinates
 
         t = -1 * R * C.T        # World origin position in camera coordinates
-        print(R, t)
         Rt = np.concatenate((R, t), axis=1)
 
         for i, x in enumerate(features):
@@ -217,6 +228,7 @@ def main():
         print(frame)
     file.flush()
     file.close()
+    showMap(features)
 
 cv2.waitKey()
 cv2.destroyAllWindows()

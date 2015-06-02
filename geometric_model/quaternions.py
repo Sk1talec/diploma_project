@@ -2,7 +2,6 @@ __author__ = 'Kirill'
 import numpy as np
 from math import *
 
-
 def q2r(q):
     r = float(q[0])
     x = float(q[1])
@@ -73,14 +72,15 @@ def qconj(q):
     return q_out
 
 def normJac(q):
-     r=float(q[0])
-     x=float(q[1])
-     y=float(q[2])
-     z=float(q[3])
+    r=float(q[0])
+    x=float(q[1])
+    y=float(q[2])
+    z=float(q[3])
 
-     return (r*r+x*x+y*y+z*z) ** (-3/2) * np.matrix([
-            [x*x+y*y+z*z, -r*x, -r*y, -r*z],
-            [-x*r, r*r+y*y+z*z, -x*y, -x*z],
-            [-y*r, -y*x, r*r+x*x+z*z, -y*z],
-            [-z*r, -z*x, -z*y, r*r+x*x+y*y]],
-                                                    np.float32)
+    print(np.power((r*r+x*x+y*y+z*z), (-3./ 2.)))
+    return np.power((r*r+x*x+y*y+z*z), (-3./ 2.)) * np.matrix([
+           [x*x+y*y+z*z, -r*x, -r*y, -r*z],
+           [-x*r, r*r+y*y+z*z, -x*y, -x*z],
+           [-y*r, -y*x, r*r+x*x+z*z, -y*z],
+           [-z*r, -z*x, -z*y, r*r+x*x+y*y]],
+                                                   np.float32)

@@ -4,6 +4,10 @@ import numpy as np
 import quaternions
 from math import *
 
+def ASSERT_MATR(m):
+    if "matrix" not in str(type(m)):
+        raise Exception("type: " + str(type(m)) + " is not a matrix.")
+    return m
 
 def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
 
@@ -18,8 +22,8 @@ def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
     uu = u
     vu = v
 
-    X_c = -(U0-uu)/fku
-    Y_c = -(V0-vu)/fkv
+    X_c = -(U0-uu)/float(fku)
+    Y_c = -(V0-vu)/float(fkv)
     Z_c = 1
 
     XYZ_c = np.matrix([X_c, Y_c, Z_c], np.float32).T
@@ -43,23 +47,22 @@ def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
                                   dphi_dqwr,
                                   np.zeros((1,4), np.float32)),
                              axis=0)
-
     dy_drw = np.concatenate((
                                 np.eye(3, dtype=np.float32),
                                 np.zeros((3,3), np.float32)),
                             axis=0)
-
     dy_dxv = np.concatenate((
                                 dy_drw,
                                 dy_dqwr,
                                 np.zeros((6,6), np.float32)),
                             axis=1)
-
+    ASSERT_MATR(dy_dqwr)
     dyprima_dgw = np.concatenate((
                                      np.zeros((3,3), np.float32),
                                      dtheta_dgw,
                                      dphi_dgw ),
                                  axis=0)
+    ASSERT_MATR(dyprima_dgw)
     dgw_dgc = R_wc
     dgc_dhu = np.matrix([
                             [+1/fku, 0, 0],
@@ -79,7 +82,7 @@ def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
                                                  np.eye(1,1,dtype=np.float32)),
                                              axis=1)),
                              axis=0)
-
+    ASSERT_MATR(dy_dhd)
     Ri = np.eye(2)*std_pxl ** 2
 
     Padd = np.concatenate((np.concatenate((
@@ -91,37 +94,41 @@ def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
                                               np.eye(1,1,dtype=np.float32) * (std_rho ** 2)),
                                           axis=1)),
                           axis=0)
+    Padd = np.matrix(Padd, dtype=np.float32)
 
     P_xv = P[0:13, 0:13]
     P_yxv = P[13:, 0:13]
     P_y = P[13:, 13:]
     P_xvy = P[0:13, 13:]
-    return np.concatenate((np.concatenate((P_xv, P_xvy, P_xv*dy_dxv.T), axis=1),
+
+    return np.concatenate((np.concatenate((P_xv, P_xvy, ASSERT_MATR(P_xv*dy_dxv.T)), axis=1),
                             np.concatenate((P_yxv, P_y, P_yxv*dy_dxv.T), axis=1),
-                            np.concatenate((dy_dxv*P_xv, dy_dxv*P_xvy, dy_dxv*P_xv*dy_dxv.T + dy_dhd*Padd*dy_dhd.T), axis=1)),
+                            np.concatenate((dy_dxv*P_xv, dy_dxv*P_xvy, dy_dxv*P_xv*dy_dxv.T + ASSERT_MATR(dy_dhd*Padd*dy_dhd.T)), axis=1)),
                            axis=0)
 
 def dRq_times_a_by_dq(q,aMat):
 
-  out=np.zeros((3,4), np.float32)
+    out=np.zeros((3,4), np.float32)
 
-  TempR = dR_by_dq0(q)
-  Temp31 = TempR * aMat
-  out[0:3,0]=Temp31.T
+    TempR = dR_by_dq0(q)
+    Temp31 = TempR * aMat
+    out[0:3,0]=Temp31.T
 
-  TempR = dR_by_dqx(q)
-  Temp31 = TempR * aMat
-  out[0:3,1]=Temp31.T
+    TempR = dR_by_dqx(q)
+    Temp31 = TempR * aMat
+    out[0:3,1]=Temp31.T
 
-  TempR = dR_by_dqy(q)
-  Temp31 = TempR * aMat
-  out[0:3,2]=Temp31.T
+    TempR = dR_by_dqy(q)
+    Temp31 = TempR * aMat
+    out[0:3,2]=Temp31.T
 
-  TempR = dR_by_dqz(q)
-  Temp31 = TempR * aMat
-  out[0:3,3]=Temp31.T
+    TempR = dR_by_dqz(q)
+    Temp31 = TempR * aMat
+    out[0:3,3]=Temp31.T
 
-  return out
+    out = np.matrix(out, dtype=np.float32)
+    ASSERT_MATR(out)
+    return out
 
 
 def dR_by_dq0(q):
@@ -173,12 +180,13 @@ def compute_F_cam(x, dt):
     omega = x[10:13]
     omega_tmp=x[10:13] * dt
     q_old=x[3:7]
-    F = np.matrix(np.eye(13))
+    F = np.matrix(np.eye(13), dtype=np.float32)
     qwt=quaternions.v2q((omega_tmp[0], omega_tmp[1], omega_tmp[2]))
 
     F[3:7, 3:7] = dq3_dq2(qwt)
     F[0:3, 7:10] = np.eye(3) * dt
     F[3:7, 10:13] = dq3_dq1(q_old) * domega_dt(omega, dt)
+    ASSERT_MATR(F)
     return F
 
 def domega_dt(o, dt):
@@ -191,7 +199,7 @@ def domega_dt(o, dt):
         [qA_oA(a, o_mod, dt)      , qA_oB(a, b, o_mod, dt), qA_oB(a, c, o_mod, dt)],
         [qA_oB(b, a, o_mod, dt), qA_oA(b, o_mod, dt)      , qA_oB(b, c, o_mod, dt)],
         [qA_oB(c, a, o_mod, dt), qA_oB(c, b, o_mod, dt), qA_oA(c, o_mod, dt)      ],
-    ])
+    ], dtype=np.float32)
 
 def q0_oA(o, m, dt):
     return (-dt / 2.0) * (o / m) * sin(m * dt / 2.0)
@@ -233,7 +241,8 @@ def calculate_H_inverse_depth(x_camera, y, K, h, features_size, feature_index):
     H = np.zeros((2, 13 + 6 * features_size), np.float32)
     H[:, 0:13] = dh_dxv( K, x_camera, y, h)
     H[:,feature_index: feature_index + 6] = dh_dy( K, x_camera, y, h)
-
+    H = np.matrix(H, dtype=np.float32)
+    ASSERT_MATR(H)
     return H
 
 
@@ -288,16 +297,18 @@ def dhrl_drw( Xv_km1_k, yi ):
 
 
 def dh_dhrl( camera, Xv_km1_k, yi, zi ):
-    return dhd_dhu( camera, zi )*dhu_dhrl( camera, Xv_km1_k, yi )
+    return ASSERT_MATR(dhd_dhu( camera, zi ))* ASSERT_MATR(dhu_dhrl( camera, Xv_km1_k, yi ))
 
 
 def dhd_dhu( camera, zi_d ):
     #inv_a = jacob_undistor_fm( camera, zi_d );
-    return np.eye(2,2, dtype=np.float32)
+    return np.matrix(np.eye(2,2, dtype=np.float32))
 
 
 def dhu_dhrl( camera, Xv_km1_k, yi ):
     f = camera[0, 0]
+    #ku = 1 / dx
+    #kv = 1 / dy
     ku = 1
     kv = 1
     rw = Xv_km1_k[0:3]
@@ -312,8 +323,70 @@ def dhu_dhrl( camera, Xv_km1_k, yi ):
     hcx = float(hc[0])
     hcy = float(hc[1])
     hcz = float(hc[2])
-    return np.concatenate([np.matrix([[f*ku/(hcz), 0, -hcx*f*ku/(hcz ** 2)]], np.float32),
-        np.matrix([[0, f*kv/(hcz), -hcy*f*kv/(hcz ** 2)]], np.float32)], axis=0)
+    return np.matrix([
+                         [f*ku/(hcz), 0, -hcx*f*ku/(hcz ** 2)],
+                         [0, f*kv/(hcz), -hcy*f*kv/(hcz ** 2)]],
+                     dtype=np.float32)
 
 def dqbar_by_dq():
-    return np.matrix(np.diag([1, -1, -1, -1]), np.float32);
+    return np.matrix(np.diag([1, -1, -1, -1]), np.float32)
+
+
+def func_Q(x, Pn, dt):
+    omegaOld=x[10:13]
+    qOld=x[3:7]
+    qwt=quaternions.v2q(omegaOld*dt)
+
+    G=np.matrix(np.zeros((13,6), dtype=np.float32))
+
+    G[7:10, 0:3]=np.matrix(np.eye(3))
+    G[10:13,3:6]=np.matrix(np.eye(3))
+    G[0:3,0:3]=np.matrix(np.matrix(np.eye(3)*dt))
+    G[3:7,3:6]=dq3_by_dq1(qOld)*dqomegadt_by_domega(omegaOld,dt)
+
+    return G*Pn*G.T
+
+def dqomegadt_by_domega(omega, delta_t):
+    result = np.matrix(np.zeros((4,3), dtype=np.float32))
+
+    omegamod = np.linalg.norm(omega)
+
+    result[0, 0] = dq0_by_domegaA(omega[0], omegamod, delta_t)
+    result[0, 1] = dq0_by_domegaA(omega[1], omegamod, delta_t)
+    result[0, 2] = dq0_by_domegaA(omega[2], omegamod, delta_t)
+    result[1, 0] = dqA_by_domegaA(omega[0], omegamod, delta_t)
+    result[1, 1] = dqA_by_domegaB(omega[0], omega[1], omegamod, delta_t)
+    result[1, 2] = dqA_by_domegaB(omega[0], omega[2], omegamod, delta_t)
+    result[2, 0] = dqA_by_domegaB(omega[1], omega[0], omegamod, delta_t)
+    result[2, 1] = dqA_by_domegaA(omega[1], omegamod, delta_t)
+    result[2, 2] = dqA_by_domegaB(omega[1], omega[2], omegamod, delta_t)
+    result[3, 0] = dqA_by_domegaB(omega[2], omega[0], omegamod, delta_t)
+    result[3, 1] = dqA_by_domegaB(omega[2], omega[1], omegamod, delta_t)
+    result[3, 2] = dqA_by_domegaA(omega[2], omegamod, delta_t)
+
+    return result
+
+def dq0_by_domegaA(omegaA, omega, delta_t):
+    return (-delta_t / 2.0) * (omegaA / omega) * sin(omega * delta_t / 2.0)
+
+
+def dqA_by_domegaA(omegaA, omega, delta_t):
+  return (delta_t / 2.0) * omegaA * omegaA / (omega * omega) * cos(omega * delta_t / 2.0) +\
+         (1.0 / omega) * (1.0 - omegaA * omegaA / (omega * omega)) * sin(omega * delta_t / 2.0)
+
+
+def dqA_by_domegaB(omegaA, omegaB, omega, delta_t):
+
+  return (omegaA * omegaB / (omega * omega)) * ( (delta_t / 2.0) * cos(omega * delta_t / 2.0)
+                                                 - (1.0 / omega) * sin(omega * delta_t / 2.0) )
+
+def dq3_by_dq1(q2_in):
+     R=float(q2_in[0])
+     X=float(q2_in[1])
+     Y=float(q2_in[2])
+     Z=float(q2_in[3])
+
+     return np.matrix([[R, -X, -Y, -Z],
+                [X,  R, -Z,  Y],
+		        [Y,  Z,  R, -X],
+		        [Z, -Y,  X,  R]], dtype=np.float32)
