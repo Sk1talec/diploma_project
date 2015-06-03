@@ -7,10 +7,13 @@ import numpy as np
 from math import cos, sin, pi, sqrt, acos
 
 VISUAL_MODE=True
-NUM_FRAMES = 500
+NUM_FRAMES = 300
 
 DUMP_FILE="data_temp.txt"
 VIDEO_FILE="myVideo_temp.avi"
+
+FEATURES_FILE="model_features.txt"
+CAMERA_FILE="model_camera.txt"
 
 D = 400
 FPS = 10
@@ -18,6 +21,8 @@ FPS = 10
 Speed = 10
 K = 10
 N = 1000
+
+INITIAL_CAMERA_POS = [0, 7., 0]
 '''
 for i in xrange(N):
     x = random.random()*K * 2
@@ -41,7 +46,7 @@ plane2 = plane2[..., np.newaxis]
 def feature(plane, x, y):
     if VISUAL_MODE:
         for i in xrange(5):
-            plane.append((x, y, i / 10., 1))
+            plane.append((x, y, i / 10. + 1, 1))
     else:
         plane.append((x, y, 3, 1))
 
@@ -59,16 +64,16 @@ def fill_square(plane):
 def generate_features():
     plane1 = []
 
-    feature(plane1, -1, 1) # 1
-    feature(plane1, -1, 2) # 2
-    feature(plane1, 2, 1) # 3
-    feature(plane1, 2, 2) # 4
+    feature(plane1, -1, -1) # 1
+    feature(plane1, -1, -2) # 2
+    feature(plane1, 1, -1) # 3
+    feature(plane1, 1, -2) # 4
     feature(plane1, 0, -10) # 5
     feature(plane1, 5, -8)  # 6
-    feature(plane1, 5, -50) # 7
-    feature(plane1, 2, -80) # 8
-    feature(plane1, 10, -100) # 9
-    feature(plane1, -5, -100) # 10
+    feature(plane1, 5, -9) # 7
+    feature(plane1, -5, -8) # 8
+    feature(plane1, -5, -9) # 9
+    # feature(plane1, -10, -100) # 10
     # feature(plane1, 20, -150) # 11
     # feature(plane1, 1, -4)    # 12
     # feature(plane1, 100, -150) # 14
@@ -151,26 +156,52 @@ def showMap(features):
     plt.plot(x, y, 'ro')
     plt.show()
 
+def show_plot(name, trajectory, scale_factor=[1, 1, 1]):
+    from matplotlib import pyplot
+    import pylab
+    from mpl_toolkits.mplot3d import Axes3D
 
+    fig = pylab.figure()
+    ax = Axes3D(fig)
+
+    x = [trajectory[i][0] * scale_factor[0] for i in xrange(len(trajectory))]
+    y = [trajectory[i][1] * scale_factor[1] for i in xrange(len(trajectory))]
+    z = [trajectory[i][2] * scale_factor[2] for i in xrange(len(trajectory))]
+
+    ax.scatter(x, y, z)
+    pyplot.savefig(name + '.png')
+    pyplot.show()
 
 def main():
     global K
-    file = open(DUMP_FILE, "w")
+    dump_file = open(DUMP_FILE, "w")
+    out_features = open(FEATURES_FILE, "w")
+    out_camera = open(CAMERA_FILE, "w")
     K = get_camera_matrix()
     features = generate_features()
     v = cv2.VideoWriter(VIDEO_FILE, cv2.cv.CV_FOURCC('M', 'S', 'V', 'C'), FPS, (D, D))
+
+    trajectory = []
+    initialized = False
     for frame in xrange(NUM_FRAMES):
         tf = frame
-        if ((frame + 100) % 200 < 100):
-            frame = 100 - (frame % 100)
-        else:
-            frame = (frame % 100)
+        # if ((frame + 100) % 200 < 100):
+        #     frame = 100 - (frame % 100)
+        # else:
+        #     frame = (frame % 100)
 
         screen = np.zeros((D,D,3),np.uint8)
 
         offset = -15 + 30. * frame / 100.
         #camera = [offset, frame / 5., 2 * cos(2 * pi / 30. * offset)]
-        camera = [sin(2 * pi / 100. * frame) * 0.5, frame / 10. + 7., 1]
+        #path_x = sin(2 * pi / 100. * frame) * 1.5
+        #path_y = frame / 20. + 7.
+
+        path_x = sin(2 * pi / 100. * frame) * 1.5
+        path_y = cos(2 * pi / 100. * frame) * 1.5
+        path_z = sin(2 * pi / 100. * frame) * 0.5
+        camera = [path_x  + INITIAL_CAMERA_POS[0], path_y + INITIAL_CAMERA_POS[1], path_z + INITIAL_CAMERA_POS[2]]
+
         print(tf, frame, camera)
         #camera = [0, frame / 10. + 7., 1]
         eye = np.array(camera, np.float32)
@@ -200,6 +231,15 @@ def main():
         t = -1 * R * C.T        # World origin position in camera coordinates
         Rt = np.concatenate((R, t), axis=1)
 
+        if not initialized:
+            initialized=True
+            first_cam_pos=Rt
+            for i, x in enumerate(features):
+                tmp = Rt * x
+                out_features.write("{} {} {}\n".format(float(tmp[0]), float(tmp[1]), float(tmp[2])))
+
+        trajectory.append(np.array([[camera[0], camera[1], camera[2], 1]]).T)
+
         for i, x in enumerate(features):
             s = (K * Rt * x)
             if (s[2,0] < 0): continue
@@ -209,8 +249,10 @@ def main():
                 continue
             screen[D - s[1,0], s[0,0]] = (255, 255, 255)
 
-            file.write("{} {} {} {:.0f} \n".format(tf, i, 0, s[0,0]))
-            file.write("{} {} {} {:.0f} \n".format(tf, i, 1, s[1,0]))
+            #dump_file.write("{} {} {} {:.0f} \n".format(tf, i, 0, s[0,0]))
+            #dump_file.write("{} {} {} {:.0f} \n".format(tf, i, 1, s[1,0]))
+            dump_file.write("{} {} {} {:.0f} \n".format(tf, i, 0, D - s[1,0]))
+            dump_file.write("{} {} {} {:.0f} \n".format(tf, i, 1, s[0,0]))
 
         '''
         for x in plane2:
@@ -226,9 +268,17 @@ def main():
 
         v.write(screen)
         print(frame)
-    file.flush()
-    file.close()
-    showMap(features)
+
+    right_trj = []
+    for t in trajectory:
+        tmp = first_cam_pos * t
+        right_trj.append(tmp)
+        out_camera.write("{} {} {}\n".format(float(tmp[0]), float(tmp[1]), float(tmp[2])))
+    out_features.close()
+    out_camera.close()
+    dump_file.close()
+    v.release()
+    show_plot('model_camera', right_trj)
 
 cv2.waitKey()
 cv2.destroyAllWindows()

@@ -77,7 +77,6 @@ def normJac(q):
     y=float(q[2])
     z=float(q[3])
 
-    print(np.power((r*r+x*x+y*y+z*z), (-3./ 2.)))
     return np.power((r*r+x*x+y*y+z*z), (-3./ 2.)) * np.matrix([
            [x*x+y*y+z*z, -r*x, -r*y, -r*z],
            [-x*r, r*r+y*y+z*z, -x*y, -x*z],

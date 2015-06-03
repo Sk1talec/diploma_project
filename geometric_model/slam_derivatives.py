@@ -33,10 +33,10 @@ def add_a_feature_covariance_inverse_depth(P, u, v, Xv, std_pxl, std_rho, K):
     Y_w = float(XYZ_w[1])
     Z_w = float(XYZ_w[2])
 
-    dtheta_dgw = np.matrix([Z_w/(X_w ** 2+Z_w ** 2), 0, -X_w/(X_w ** 2+Z_w ** 2)], np.float32)
+    dtheta_dgw = np.matrix([Z_w/(X_w ** 2 + Z_w ** 2), 0, -X_w/(X_w ** 2 + Z_w ** 2)], np.float32)
     dphi_dgw = np.matrix([(X_w * Y_w)/((X_w ** 2 + Y_w ** 2 + Z_w ** 2) * sqrt(X_w ** 2 + Z_w ** 2)),
                  -sqrt(X_w ** 2 + Z_w ** 2)/(X_w ** 2 + Y_w ** 2 + Z_w ** 2),
-                 (Z_w * Y_w)/((X_w ** 2 + Y_w ** 2 + Z_w ** 2)*sqrt(X_w ** 2 + Z_w ** 2))], np.float32)
+                 (Z_w * Y_w)/((X_w ** 2 + Y_w ** 2 + Z_w ** 2) * sqrt(X_w ** 2 + Z_w ** 2))], np.float32)
     dgw_dqwr = dRq_times_a_by_dq( q_wc, XYZ_c )
 
     dtheta_dqwr = dtheta_dgw*dgw_dqwr

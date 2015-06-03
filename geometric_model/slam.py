@@ -9,6 +9,7 @@ import quaternions
 SHOW_FEATURES=True
 
 TRACKS_FILE='data_temp.txt'
+TEST_FEATURE = 40
 
 FPS = 10
 D = 400
@@ -25,9 +26,11 @@ STD_PXL = 1
 
 eps = 1e-10
 #Linear acceleration noise covariance
-sigma_a = 0.07
+sigma_a = 0.0015
+init_lv = 0.0015
 #Angular acceleration noise covariance
-sigma_alpha = 0.07
+sigma_alpha = 0.0015
+init_av = 0.0015
 
 initial_depth = 1
 
@@ -48,13 +51,11 @@ x[5] = 0
 x[6] = 0
 
 #linear velocity
-init_lv = 0.025
 x[7] = 0
 x[8] = 0
 x[9] = 0
 
 #Angular velocity
-init_av = 0.025
 x[10] = 1e-15
 x[11] = 1e-15
 x[12] = 1e-15
@@ -111,7 +112,7 @@ def read_frames():
 
 def predict_camera_measurement(x, frame_features):
     camera_position = x[0:3]
-    r_wc = quaternions.q2r(x[3:7])
+    camera_rotation = quaternions.q2r(x[3:7])
 
     for feature in frame_features:
         feature_number = feature[0]
@@ -119,7 +120,7 @@ def predict_camera_measurement(x, frame_features):
             continue
         i = FEATURES_DATA[feature_number].index
         y = x[i : i + 6]
-        h = h_inverse_depth(y, camera_position, r_wc)
+        h = h_inverse_depth(y, camera_position, camera_rotation)
         if (len(h) > 0):
             FEATURES_DATA[feature_number].h = h.T
         else:
@@ -264,7 +265,7 @@ def compute_features_derivatives(x, K, frame_features):
     x_camera = x[:13]
     for feature in (frame_features):
         f_number = feature[0]
-        if (not visible_feature(f_number) and len(FEATURES_DATA[f_number].h) > 0):
+        if (not visible_feature(f_number) or len(FEATURES_DATA[f_number].h) == 0):
             continue
         i = FEATURES_DATA[f_number].index
         y = x[i : i + 6]
@@ -277,7 +278,6 @@ def update_features(x, P, frame_features):
 
     for feature in (frame_features):
         feature_number = feature[0]
-        # TODO deal with features delete and failures with feature initialisation
         if (not visible_feature(feature_number)):
             continue
         if len(FEATURES_DATA[feature_number].h) > 0:
@@ -288,9 +288,7 @@ def update_features(x, P, frame_features):
 
 def update(x_tmp, P_tmp, z, h, H, R):
     if len(z)>0:
-        print "Z_LEN", len(z)
         S = H * P_tmp * H.T + R
-        print(H.shape, P_tmp.shape, R.shape, S.shape)
         K = P_tmp * H.T * S.I
 
         x = x_tmp + K*(z - h)
@@ -305,7 +303,7 @@ def update(x_tmp, P_tmp, z, h, H, R):
                                np.concatenate([P[7:,0:3], P[7:, 3:7] * Jnorm.T, P[7:,7:]], axis=1)],
                            axis=0)
 
-        x[3:7] = x[3:7] / np.linalg.norm( x[3:7])
+        x[3:7] = x[3:7] / np.linalg.norm(x[3:7])
         return x, P
     else:
         return x_tmp, P_tmp
@@ -317,11 +315,14 @@ def update_step(x_tmp, P_tmp, frame_features):
     h = []
     H = []
 
+    #srt = sorted(FEATURES_DATA.items(), key=lambda x: x[1].index)
+
+    #for feature in (srt):
     for feature in (frame_features[0:]):
         f_number = feature[0]
-        if (not visible_feature(f_number) or (len(FEATURES_DATA[f_number].h) == 0)):
+        if not visible_feature(f_number) or (len(FEATURES_DATA[f_number].h) == 0):
             continue
-        if (z == []):
+        if z == []:
             z = FEATURES_DATA[f_number].z
             h = FEATURES_DATA[f_number].h
             H = FEATURES_DATA[f_number].H
@@ -345,8 +346,7 @@ def update_features_indexes(i):
 
 
 
-def cut_x_and_p(current_frame, prev_frame):
-    global x, P
+def cut_x_and_p(x, P, current_frame, prev_frame):
     found_features = set()
     for p_feature in prev_frame:
         prev_f_num = p_feature[0]
@@ -409,7 +409,7 @@ def print_result(x, frame_features):
         print("FEATURE", feature[0], "XYZ cords: ", a, b, c)
 
 
-def show_plot(trajectory):
+def show_plot(name, trajectory, right_trajectory, scale_factor):
     from matplotlib import pyplot
     import pylab
     from mpl_toolkits.mplot3d import Axes3D
@@ -417,11 +417,19 @@ def show_plot(trajectory):
     fig = pylab.figure()
     ax = Axes3D(fig)
 
-    x = [trajectory[i][0] for i in xrange(len(trajectory))]
-    y = [trajectory[i][1] for i in xrange(len(trajectory))]
-    z = [trajectory[i][2] for i in xrange(len(trajectory))]
+    x = [trajectory[i][0] * scale_factor[0] for i in xrange(len(trajectory))]
+    y = [trajectory[i][1] * scale_factor[1] for i in xrange(len(trajectory))]
+    z = [trajectory[i][2] * scale_factor[2] for i in xrange(len(trajectory))]
 
     ax.scatter(x, y, z)
+
+    x = [right_trajectory[i][0] for i in xrange(len(right_trajectory))]
+    y = [right_trajectory[i][1] for i in xrange(len(right_trajectory))]
+    z = [right_trajectory[i][2] for i in xrange(len(right_trajectory))]
+
+    ax.scatter(x, y, z, c='r')
+
+    pyplot.savefig(name + '.png')
     pyplot.show()
 
 
@@ -442,6 +450,29 @@ def post_update_features(x, P, frame_features):
             FEATURES_DATA[f_num].y = x[i : i + 6]
 
 
+def compute_scale_factor(right_feature, feature):
+    x, y, z = feature_2_cartesian(feature)
+    return right_feature[0] / x, right_feature[1] / y, right_feature[2] / z
+
+
+def read_right_data():
+    import model
+    camera_file = open(model.CAMERA_FILE, "r")
+    features_file = open(model.FEATURES_FILE, "r")
+
+    camera_path = []
+    for l in camera_file.readlines():
+        camera_path.append(map(float, l[:-1].split(" ")))
+    camera_file.close()
+
+    features_cords = []
+    for l in features_file.readlines():
+        features_cords.append(map(float, l[:-1].split(" ")))
+    features_file.close()
+
+    return camera_path, features_cords
+
+
 def main():
     temp_out = open("temp_out.txt", "w")
     import sys
@@ -449,6 +480,7 @@ def main():
     #np.set_printoptions(precision=4, suppress=True)
 
     frames = read_frames()
+    right_data = read_right_data()
     global F, H, P, x, u
     #dt = 1. / FPS
     dt = 1. / FPS
@@ -460,7 +492,7 @@ def main():
         print("Frame: ", str(k), "Num features:", len(frames[k]))
         print("POSITION", float(x[0]), float(x[1]), float(x[2]))
         #prepare_features()
-        x, P = cut_x_and_p(frames[k], frames[k-1])
+        x, P = cut_x_and_p(x, P, frames[k], frames[k-1])
         update_features_info()
         x, P = init_features(x, P, frames[k - 1]) #From prev frame
         # PREDICT STEP
@@ -479,12 +511,13 @@ def main():
 
     temp_out.flush()
     temp_out.close()
-    show_plot(cam_trajectory)
+    scale_factor = compute_scale_factor(right_data[1][TEST_FEATURE], FEATURES_DATA[TEST_FEATURE].y)
+    show_plot('slam_camera', cam_trajectory, right_data[0], scale_factor)
     features_positions = []
     if SHOW_FEATURES:
         for key in FEATURES_DATA:
             features_positions.append(feature_2_cartesian(FEATURES_DATA[key].y))
-    show_plot(features_positions)
+    show_plot('slam_features', features_positions, right_data[1], scale_factor)
     print("LEN", len(cam_trajectory), len(features_positions))
 
 if __name__ == '__main__':
